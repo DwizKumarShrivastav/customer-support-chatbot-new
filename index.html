@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupportBot</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: system-ui;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-950 text-white min-h-screen flex items-center justify-center">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-2xl bg-gray-900 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+
+        <!-- Header -->
+        <div class="bg-blue-600 p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-3xl">
+                🤖
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold">SupportBot</h1>
+                <p class="text-xs text-blue-200">AI + Human Support</p>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="chat" class="flex-1 p-6 overflow-y-auto space-y-4 bg-gray-950"></div>
+
+        <!-- Input Area -->
+        <div class="p-4 border-t border-gray-700 bg-gray-900">
+            <div class="flex gap-2">
+                <input id="msgInput" type="text" placeholder="Type your message..."
+                    class="flex-1 bg-gray-800 rounded-3xl px-6 py-4 focus:outline-none text-white">
+
+                <button onclick="sendMessage()"
+                    class="bg-blue-600 hover:bg-blue-700 w-14 h-14 rounded-3xl flex items-center justify-center text-2xl">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        let ws;
+        let isConnected = false;
+
+        // ✅ Auto connect when page loads
+        window.onload = () => {
+            console.log("Chat started...");
+            connectWebSocket();
+        };
+
+        function connectWebSocket() {
+            ws = new WebSocket("ws://localhost:8080/ws/chat");
+
+            ws.onopen = () => {
+                console.log("✅ WebSocket Connected");
+                isConnected = true;
+            };
+
+            ws.onmessage = (e) => {
+                console.log("Received:", e.data);
+
+                try {
+                    const data = JSON.parse(e.data);
+                    addMessage(data.message, data.sender);
+                } catch {
+                    addMessage(e.data, "BOT");
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error("❌ WebSocket Error:", err);
+                isConnected = false;
+            };
+
+            ws.onclose = () => {
+                console.warn("⚠️ WebSocket closed. Reconnecting...");
+                isConnected = false;
+                setTimeout(connectWebSocket, 2000); // auto reconnect
+            };
+        }
+
+        function addMessage(text, sender) {
+            const chat = document.getElementById("chat");
+            const div = document.createElement("div");
+
+            div.className = sender === "USER"
+                ? "flex justify-end"
+                : "flex justify-start";
+
+            div.innerHTML = `
+                <div class="${sender === "USER" ? "bg-blue-600" : "bg-gray-700"} 
+                px-5 py-3 rounded-3xl max-w-[75%]">
+                ${text}
+                </div>
+            `;
+
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById("msgInput");
+            const msg = input.value.trim();
+
+            if (!msg) return;
+
+            // ❌ Prevent sending if not connected
+            if (!isConnected) {
+                alert("⏳ Connecting... Please wait 2 seconds and try again.");
+                return;
+            }
+
+            // ✅ Show user message
+            addMessage(msg, "USER");
+
+            // ✅ Send message to backend
+            ws.send(JSON.stringify({
+                type: "CHAT",
+                userId: "1",
+                message: msg
+            }));
+
+            input.value = "";
+        }
+    </script>
+
+</body>
+</html>
